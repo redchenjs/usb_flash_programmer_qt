@@ -1,7 +1,7 @@
-Bluetooth Flash Programmer
-==========================
+USB Flash Programmer
+====================
 
-User tools for Bluetooth Flash Programmer.
+User tools for USB Flash Programmer.
 
 ## Dependencies
 
@@ -9,7 +9,7 @@ User tools for Bluetooth Flash Programmer.
 cmake
 pkg-config
 qt5-default
-qt5connectivity-dev
+qt5serialport-dev
 ```
 
 ## Build
@@ -26,29 +26,29 @@ make
 ### Erase full flash chip
 
 ```
-btflash BD_ADDR erase_all
+usbflash /dev/ttyACMx erase_all
 ```
 
 ### Erase flash
 
 ```
-btflash BD_ADDR erase 0x0000(addr) 0x1000(length)
+usbflash /dev/ttyACMx erase 0x0000(addr) 0x1000(length)
 ```
 
 ### Write flash
 
 ```
-btflash BD_ADDR write 0x0000(addr) 0x1000(length) data.bin
+usbflash /dev/ttyACMx write 0x0000(addr) 0x1000(length) data.bin
 ```
 
 ### Read flash
 
 ```
-btflash BD_ADDR read 0x0000(addr) 0x1000(length) data.bin
+usbflash /dev/ttyACMx read 0x0000(addr) 0x1000(length) data.bin
 ```
 
 ### Read flash info
 
 ```
-btflash BD_ADDR info
+usbflash /dev/ttyACMx info
 ```

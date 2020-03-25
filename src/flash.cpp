@@ -10,7 +10,7 @@
 #include <iostream>
 
 #include <QtCore>
-#include <QtBluetooth>
+#include <QtSerialPort>
 
 #include "flash.h"
 
@@ -48,7 +48,7 @@ static const rsp_fmt_t rsp_fmt[] = {
 
 void FlashProgrammer::sendData(void)
 {
-    char read_buff[990] = {0};
+    char read_buff[64] = {0};
     uint32_t data_remain = data_size - data_done;
 
     if (m_device->bytesToWrite() != 0) {
@@ -177,6 +177,10 @@ void FlashProgrammer::processData(void)
 
 void FlashProgrammer::processError(void)
 {
+    if (m_device->error() == QSerialPort::NoError) {
+        return;
+    }
+
     if (rw_in_progress != RW_NONE) {
         std::cout << std::endl << "== ERROR";
     } else {
@@ -186,10 +190,29 @@ void FlashProgrammer::processError(void)
     stop();
 }
 
+void FlashProgrammer::connectToDevice(const QString &port)
+{
+    m_device->setPortName(port);
+    if (m_device->open(QIODevice::ReadWrite)) {
+        m_device->setDataBits(QSerialPort::Data8);
+        m_device->setParity(QSerialPort::NoParity);
+        m_device->setStopBits(QSerialPort::OneStop);
+        m_device->setFlowControl(QSerialPort::HardwareControl);
+        m_device->clearError();
+        m_device->flush();
+
+        emit connected();
+    } else {
+        std::cout << "Could not open device" << std::endl;
+
+        emit finished(ERR_DEVICE);
+    }
+}
+
 void FlashProgrammer::printUsage(void)
 {
     std::cout << "Usage:" << std::endl;
-    std::cout << "    " << m_arg[0] << " BD_ADDR COMMAND" << std::endl << std::endl;
+    std::cout << "    " << m_arg[0] << " /dev/ttyACMx COMMAND" << std::endl << std::endl;
     std::cout << "Commands:" << std::endl;
     std::cout << "    erase_all\t\t\terase full flash chip" << std::endl;
     std::cout << "    erase addr length\t\terase flash start from [addr] for [length] bytes" << std::endl;
@@ -214,20 +237,19 @@ void FlashProgrammer::start(int argc, char *argv[])
     m_arg = argv;
     std::cout << std::unitbuf;
 
-    QBluetoothAddress bdaddr = QBluetoothAddress(m_arg[1]);
+    QString port = QString(m_arg[1]);
     QString command = QString(m_arg[2]);
 
-    m_device = new QBluetoothSocket(QBluetoothServiceInfo::RfcommProtocol, this);
-    connect(m_device, SIGNAL(connected()), this, SLOT(sendCommand()));
+    m_device = new QSerialPort(this);
+    connect(this, SIGNAL(connected()), this, SLOT(sendCommand()));
     connect(m_device, SIGNAL(readyRead()), this, SLOT(processData()));
-    connect(m_device, SIGNAL(disconnected()), this, SLOT(processError()));
-    connect(m_device, SIGNAL(error(QBluetoothSocket::SocketError)), this, SLOT(processError()));
+    connect(m_device, SIGNAL(error(QSerialPort::SerialPortError)), this, SLOT(processError()));
 
     if (command == "erase_all" && argc == 3) {
         m_cmd_idx = CMD_IDX_ERASE_ALL;
         snprintf(m_cmd_str, sizeof(m_cmd_str), CMD_FMT_ERASE_ALL"\r\n");
 
-        m_device->connectToService(bdaddr, QBluetoothUuid::SerialPort);
+        connectToDevice(port);
     } else if (command == "erase" && argc == 5) {
         uint32_t addr = static_cast<uint32_t>(std::stoul(m_arg[3], nullptr, 16));
         uint32_t length = static_cast<uint32_t>(std::stoul(argv[4], nullptr, 16));
@@ -241,7 +263,7 @@ void FlashProgrammer::start(int argc, char *argv[])
         m_cmd_idx = CMD_IDX_ERASE;
         snprintf(m_cmd_str, sizeof(m_cmd_str), CMD_FMT_ERASE"\r\n", addr, length);
 
-        m_device->connectToService(bdaddr, QBluetoothUuid::SerialPort);
+        connectToDevice(port);
     } else if (command == "write" && argc == 6) {
         uint32_t addr = static_cast<uint32_t>(std::stoul(m_arg[3], nullptr, 16));
         uint32_t length = static_cast<uint32_t>(std::stoul(argv[4], nullptr, 16));
@@ -265,7 +287,7 @@ void FlashProgrammer::start(int argc, char *argv[])
         m_cmd_idx = CMD_IDX_WRITE;
         snprintf(m_cmd_str, sizeof(m_cmd_str), CMD_FMT_WRITE"\r\n", addr, length);
 
-        m_device->connectToService(bdaddr, QBluetoothUuid::SerialPort);
+        connectToDevice(port);
     } else if (command == "read" && argc == 6) {
         uint32_t addr = static_cast<uint32_t>(std::stoul(m_arg[3], nullptr, 16));
         uint32_t length = static_cast<uint32_t>(std::stoul(argv[4], nullptr, 16));
@@ -289,12 +311,12 @@ void FlashProgrammer::start(int argc, char *argv[])
         m_cmd_idx = CMD_IDX_READ;
         snprintf(m_cmd_str, sizeof(m_cmd_str), CMD_FMT_READ"\r\n", addr, length);
 
-        m_device->connectToService(bdaddr, QBluetoothUuid::SerialPort);
+        connectToDevice(port);
     } else if (command == "info" && argc == 3) {
         m_cmd_idx = CMD_IDX_INFO;
         snprintf(m_cmd_str, sizeof(m_cmd_str), CMD_FMT_INFO"\r\n");
 
-        m_device->connectToService(bdaddr, QBluetoothUuid::SerialPort);
+        connectToDevice(port);
     } else {
         printUsage();
     }

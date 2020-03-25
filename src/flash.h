@@ -9,7 +9,7 @@
 #define FLASH_H
 
 #include <QtCore>
-#include <QtBluetooth>
+#include <QtSerialPort>
 
 #define OK           0
 #define ERR_ARG     -1
@@ -40,7 +40,7 @@ private slots:
 private:
     char **m_arg = nullptr;
 
-    QBluetoothSocket *m_device = nullptr;
+    QSerialPort *m_device = nullptr;
 
     size_t m_cmd_idx = 0;
     char m_cmd_str[32] = {0};
@@ -51,9 +51,11 @@ private:
 
     size_t rw_in_progress = RW_NONE;
 
+    void connectToDevice(const QString &port);
     void printUsage(void);
 
 signals:
+    void connected(void);
     void finished(int err = OK);
 };
 
